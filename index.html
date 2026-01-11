@@ -3,7 +3,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1f2937">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%239b59b6'/%3E%3Ctext x='50%25' y='65%25' font-family='Arial' font-size='300' fill='white' text-anchor='middle'%3EG%3C/text%3E%3C/svg%3E">
     <title>Granny Run</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -13,6 +16,7 @@
             overflow: hidden;
             background-color: #f7f7f7;
             font-family: 'Press Start 2P', cursive;
+            touch-action: none; /* Prevents unwanted browser gestures on mobile */
         }
         canvas {
             display: block;
@@ -32,5 +36,17 @@
 </head>
 <body>
     <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').then(reg => {
+            console.log('SW registered:', reg);
+          }).catch(err => {
+            console.log('SW registration failed:', err);
+          });
+        });
+      }
+    </script>
+    <script type="module" src="index.tsx"></script>
 </body>
 </html>
