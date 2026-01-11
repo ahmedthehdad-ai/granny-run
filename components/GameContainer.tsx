@@ -33,6 +33,8 @@ export interface GameContainerHandle {
   stopDuck: () => void;
 }
 
+const FAST_FALL_MULTIPLIER = 4; // Multiplier for gravity when ducking mid-air
+
 const GameContainer = forwardRef<GameContainerHandle, GameContainerProps>(({ status, onGameOver, onScoreUpdate }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(0);
@@ -74,6 +76,8 @@ const GameContainer = forwardRef<GameContainerHandle, GameContainerProps>(({ sta
     const p = playerRef.current;
     p.isDucking = false;
     p.height = GRANNY_HEIGHT;
+    // If we're not jumping, reset Y to stand height. 
+    // If we ARE jumping, the physics loop will handle height adjustments.
     if (!p.isJumping) {
       p.y = GROUND_Y - GRANNY_HEIGHT;
     }
@@ -82,20 +86,25 @@ const GameContainer = forwardRef<GameContainerHandle, GameContainerProps>(({ sta
   const jump = () => {
     const p = playerRef.current;
     if (!p.isJumping && status === GameStatus.PLAYING) {
-      if (p.isDucking) {
-        stopDuck();
-      }
+      // Chrome dino allows jumping from a duck. 
+      // If ducking, we stop the duck visual height before the jump calculation if needed, 
+      // but usually the jump force just takes over.
       p.vy = JUMP_FORCE;
       p.isJumping = true;
+      // Note: we don't force stopDuck() here so that if the user is holding duck, 
+      // they immediately enter the "fast fall" state or stay ducked.
     }
   };
 
   const startDuck = () => {
     const p = playerRef.current;
-    if (!p.isJumping && status === GameStatus.PLAYING) {
+    if (status === GameStatus.PLAYING) {
       p.isDucking = true;
       p.height = GRANNY_DUCK_HEIGHT;
-      p.y = GROUND_Y - GRANNY_DUCK_HEIGHT;
+      // If on ground, adjust Y immediately. If in air, the physics loop will handle it.
+      if (!p.isJumping) {
+        p.y = GROUND_Y - GRANNY_DUCK_HEIGHT;
+      }
     }
   };
 
@@ -110,14 +119,14 @@ const GameContainer = forwardRef<GameContainerHandle, GameContainerProps>(({ sta
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault();
         jump();
-      } else if (e.key === 'Shift') {
+      } else if (e.key === 'Shift' || e.code === 'ArrowDown') {
         e.preventDefault();
         startDuck();
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Shift') {
+      if (e.key === 'Shift' || e.code === 'ArrowDown') {
         e.preventDefault();
         stopDuck();
       }
@@ -137,6 +146,7 @@ const GameContainer = forwardRef<GameContainerHandle, GameContainerProps>(({ sta
     const y = p.y;
     const isDuck = p.isDucking;
     
+    // Hair
     ctx.fillStyle = '#cccccc';
     if (isDuck) {
       ctx.fillRect(x + 25, y + 5, 12, 12);
@@ -144,6 +154,7 @@ const GameContainer = forwardRef<GameContainerHandle, GameContainerProps>(({ sta
       ctx.fillRect(x + 20, y - 5, 15, 15);
     }
 
+    // Head
     ctx.fillStyle = '#ffdbac';
     if (isDuck) {
       ctx.fillRect(x + 15, y + 10, 18, 15);
@@ -151,6 +162,7 @@ const GameContainer = forwardRef<GameContainerHandle, GameContainerProps>(({ sta
       ctx.fillRect(x + 10, y + 5, 20, 20);
     }
 
+    // Glasses
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 1.5;
     if (isDuck) {
@@ -161,6 +173,7 @@ const GameContainer = forwardRef<GameContainerHandle, GameContainerProps>(({ sta
         ctx.strokeRect(x + 22, y + 10, 8, 5);
     }
 
+    // Dress
     ctx.fillStyle = '#9b59b6';
     if (isDuck) {
       ctx.fillRect(x + 5, y + 20, 35, 10);
@@ -168,6 +181,7 @@ const GameContainer = forwardRef<GameContainerHandle, GameContainerProps>(({ sta
       ctx.fillRect(x + 5, y + 25, 30, 15);
     }
 
+    // Legs
     const legOffset = (p.isJumping || isDuck) ? 0 : Math.sin(time / 50) * 5;
     ctx.fillStyle = '#000';
     if (isDuck) {
@@ -262,7 +276,9 @@ const GameContainer = forwardRef<GameContainerHandle, GameContainerProps>(({ sta
 
     const p = playerRef.current;
     if (p.isJumping) {
-      p.vy += GRAVITY;
+      // Apply gravity. If ducking mid-air, apply much more gravity for instant drop.
+      const currentGravity = p.isDucking ? GRAVITY * FAST_FALL_MULTIPLIER : GRAVITY;
+      p.vy += currentGravity;
       p.y += p.vy;
 
       if (p.y > GROUND_Y - p.height) {
@@ -270,6 +286,9 @@ const GameContainer = forwardRef<GameContainerHandle, GameContainerProps>(({ sta
         p.vy = 0;
         p.isJumping = false;
       }
+    } else if (p.isDucking) {
+      // Keep grounded if ducking
+      p.y = GROUND_Y - p.height;
     }
 
     drawGround(ctx, time);
